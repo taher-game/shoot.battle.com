@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>BATTLE SHOOT 🎮 - V1</title>
+<title>BATTLE SHOOT 🎮 - V1.2</title>
 <style>
   :root{
     --accent:#ff3b3b;
@@ -348,6 +348,23 @@
   .admin-item-row input{width:70px; padding:6px 8px; border-radius:7px; border:1px solid var(--line); background:#0c1310; color:#eafff0; font-size:11.5px;}
   .admin-item-row button{padding:6px 10px; border-radius:7px; border:1px solid var(--accent2); background:transparent; color:var(--accent2); font-size:11px; font-weight:700;}
   .admin-coin-display{width:100%; text-align:center; font-size:15px; color:#ffe9a8; font-weight:800; margin-bottom:10px;}
+
+  /* ---- Leaderboard real-time ---- */
+  #screen-leaderboard{overflow-y:auto; padding:70px 0 30px; justify-content:flex-start;}
+  .lb-hint{font-size:11px; color:#ffe9a8; margin:-6px 0 14px; text-align:center;}
+  .lb-card .lb-title{font-size:13px; font-weight:800; color:#eafff0; margin-bottom:8px; display:flex; align-items:center; gap:6px;}
+  .lb-row{display:flex; justify-content:space-between; align-items:center; padding:7px 2px; border-bottom:1px solid var(--line); font-size:13px; color:#cfe8db;}
+  .lb-row:last-child{border-bottom:none;}
+  .lb-row.top1{color:#ffe9a8; font-weight:800;}
+
+  /* ---- Clash Squad: bot count vs jumlah player ---- */
+  .clash-note{font-size:11px; color:#9fcbb2; text-align:center; margin-top:8px; padding:0 16px;}
+
+  /* ---- HP knock (Clash Squad) ---- */
+  .hp-bar-fill.knocked{background:linear-gradient(90deg,#ffb03b,#ff5b3b);}
+  .knock-tag{position:absolute; bottom:170px; left:50%; transform:translateX(-50%); font-size:12px; color:#ffb03b;
+    background:rgba(0,0,0,0.5); padding:5px 12px; border-radius:8px; font-weight:700; display:none; text-align:center;}
+  .knock-tag.show{display:block;}
 </style>
 </head>
 <body>
@@ -359,6 +376,7 @@
 <div class="lobby-topleft" id="lobby-topleft">
   <button class="icon-btn" id="btn-shop">🛒</button>
   <button class="icon-btn" id="btn-event">📝<span class="badge-dot" id="event-dot"></span></button>
+  <button class="icon-btn" id="btn-leaderboard">📊</button>
 </div>
 
 <!-- Panel player online -->
@@ -379,7 +397,7 @@
 <!-- LOBBY -->
 <div id="screen-lobby" class="screen active">
   <div class="logo">BATTLE <span>SHOOT</span></div>
-  <button class="menu-btn primary" id="btn-mulai">▶ mulai </button>
+  <button class="menu-btn primary" id="btn-mulai">▶ MULAI </button>
   <button class="menu-btn" id="btn-multiplayer">🌐 MULTIPLAYER</button>
   <button class="menu-btn" id="btn-pengaturan">⚙ PENGATURAN</button>
   <button class="menu-btn danger" id="btn-admin-panel" style="display:none;">🛠️ ADMIN PANEL</button>
@@ -388,18 +406,18 @@
 <!-- OFFLINE MODE SELECT -->
 <div id="screen-offline-mode" class="screen">
   <button class="backbtn" data-back="screen-lobby">← Kembali</button>
-  <div class="logo" style="font-size:24px;">PILIH MODE</div>
+  <div class="logo" style="font-size:24px;">PILIH MAP</div>
   <button class="menu-btn primary" id="btn-offline-duel">⚔ Duel 1v1</button>
-  <button class="menu-btn danger" id="btn-offline-br">🔥 Battle Royale </button>
-  <button class="menu-btn" id="btn-offline-clash" style="border-color:rgba(255,157,59,0.5);">🛡️ Clash Squad 4v4</button>
+  <button class="menu-btn danger" id="btn-offline-br"> Battle Royale </button>
+  <button class="menu-btn" id="btn-offline-clash" style="border-color:rgba(255,157,59,0.5);"> Clash Squad 4v4</button>
 </div>
 
 <!-- OFFLINE DUEL SUBMODE -->
 <div id="screen-duel-submode" class="screen">
   <button class="backbtn" data-back="screen-offline-mode">← Kembali</button>
   <div class="logo" style="font-size:24px;">MODE DUEL</div>
-  <button class="menu-btn primary" id="btn-duel-normal">⚔ tekan</button>
-  <button class="menu-btn danger" id="btn-duel-headshot">☠️ pepengshot</button>
+  <button class="menu-btn primary" id="btn-duel-normal"> Tekan</button>
+  <button class="menu-btn danger" id="btn-duel-headshot"> Pepengshot</button>
 </div>
 
 <!-- SETTINGS -->
@@ -428,7 +446,7 @@
     </div>
   </div>
   <div class="panel-card" id="my-items-card">
-    <div class="field"><label>🎒 Item Kamu</label></div>
+    <div class="field"><label>Inventory</label></div>
     <div id="my-items-list" class="wait-note">Belum punya item.</div>
   </div>
   <div class="panel-card">
@@ -448,8 +466,8 @@
   <div class="logo" style="font-size:24px;">🛒 SHOP</div>
 
   <div class="shop-tabs">
-    <button id="shop-tab-baju" class="sel">Skin Baju</button>
-    <button id="shop-tab-item"> Item / Senjata</button>
+    <button id="shop-tab-baju" class="sel">Skin</button>
+    <button id="shop-tab-item"> Item </button>
   </div>
   <div class="skin-grid" id="skin-grid"></div>
   <div class="tool-grid" id="tool-grid" style="display:none;"></div>
@@ -481,8 +499,8 @@
   <div class="event-closed-msg" id="event-closed-msg">📅 Event cuma buka tiap hari <b>Minggu. Progres kamu tetap kesimpen, balik lagi hari Minggu buat lihat &amp; klaim ya!</div>
   <div id="event-content">
     <div class="mission-card">
-      <div class="m-title">🌈 Baju Pelangi</div>
-      <div class="m-item" id="m-rank"><span>Capai rank Good 🔱</span><span class="m-check" id="m-rank-check">⬜</span></div>
+      <div class="m-title">🌈 Skin Pelangi</div>
+      <div class="m-item" id="m-rank"><span>Capai rank Good 🔱</span><span class="m-check" id="m-rank-check">❌</span></div>
       <div class="m-item" id="m-hs"><span>Headshot 10x</span><span class="m-check" id="m-hs-check">0/10</span></div>
       <div class="m-item" id="m-win1v1"><span>Menang 3x mode 1v1</span><span class="m-check" id="m-win1v1-check">0/3</span></div>
       <div class="m-reward">
@@ -491,6 +509,24 @@
       </div>
     </div>
     <div id="custom-events-wrap"></div>
+  </div>
+</div>
+
+<!-- LEADERBOARD REAL-TIME -->
+<div id="screen-leaderboard" class="screen">
+  <button class="backbtn" data-back="screen-lobby">← Kembali</button>
+  <div class="logo" style="font-size:24px;">📊 LEADERBOARD</div>
+  <div class="panel-card lb-card">
+    <div class="lb-title">🎯 Headshot</div>
+    <div id="lb-headshot-list"></div>
+  </div>
+  <div class="panel-card lb-card">
+    <div class="lb-title">🏅 Rank</div>
+    <div id="lb-rank-list"></div>
+  </div>
+  <div class="panel-card lb-card">
+    <div class="lb-title">🪙  Coins</div>
+    <div id="lb-coin-list"></div>
   </div>
 </div>
 
@@ -554,16 +590,20 @@
   <button class="backbtn" data-back="screen-lobby">← Kembali</button>
   <div class="logo" style="font-size:24px;">MULTIPLAYER</div>
   <div class="server-row" id="server-duel">
-    <div class="info"><span class="dot"></span> Room war — <span class="cnt" data-server="lobby_duel">0</span> Player </div>
-    <button class="go" data-join="lobby_duel" data-type="duel">Gabung</button>
+    <div class="info"><span class="dot"></span>🌍Server War -<span class="cnt" data-server="lobby_duel">0 </span> Player </div>
+    <button class="go" data-join="lobby_duel" data-type="duel">Masuk</button>
   </div>
   <div class="server-row" id="server-br">
-    <div class="info"><span class="dot" style="background:#ffb03b; box-shadow:0 0 8px #ffb03b;"></span> Room Bermuda — <span class="cnt" data-server="lobby_br"> 0 </span> Player </div>
+    <div class="info"><span class="dot" style="background:#ffb03b; box-shadow:0 0 8px #ffb03b;"></span>🌍Server Bermuda - <span class="cnt" data-server="lobby_br"> 0 </span> Player </div>
     <button class="go" data-join="lobby_br" data-type="br">Gabung</button>
   </div>
   <div class="server-row" id="server-mabar">
-    <div class="info"><span class="dot" style="background:#7fa8ff; box-shadow:0 0 8px #7fa8ff;"></span> Room War Traning — <span class="cnt" data-server="lobby_mabar"> 0</span> Player</div>
+    <div class="info"><span class="dot" style="background:#7fa8ff; box-shadow:0 0 8px #7fa8ff;"></span>🌍Server Traning - <span class="cnt" data-server="lobby_mabar"> 0 </span> Player</div>
     <button class="go" data-join="lobby_mabar" data-type="mabar">masuk</button>
+  </div>
+  <div class="server-row" id="server-clash">
+    <div class="info"><span class="dot" style="background:#ff7fe0; box-shadow:0 0 8px #ff7fe0;"></span>🌍Server Clash Squad - <span class="cnt" data-server="lobby_clash"> 0 </span> Player</div>
+    <button class="go" data-join="lobby_clash" data-type="clash">Gabung</button>
   </div>
 </div>
 
@@ -579,6 +619,7 @@
     <button id="br-bot-yes" class="sel">dengan cpu</button>
     <button id="br-bot-no"> Tanpa cpu</button>
   </div>
+  <div class="clash-note" id="clash-note" style="display:none;">⚔️ Tim kamu (semua pemain di room ini) akan melawan CPU — jumlah CPU otomatis menyesuaikan jumlah pemain</div>
   <div class="wait-invite-wrap" id="wait-invite-wrap" style="display:none;">
     <button class="inv-toggle" id="btn-toggle-invite">👥 Undang Player </button>
     <div class="invite-list" id="invite-online-list"></div>
@@ -600,6 +641,7 @@
   <button class="exit-game-btn" id="exit-game-btn">🔙keluar</button>
   <div class="death-notif" id="death-notif"></div>
   <div class="loot-hint" id="loot-hint">cari senjata di sekitar peta!</div>
+  <div class="knock-tag" id="knock-tag">Kamu knock</div>
   <div class="hs-notif-wrap" id="hs-notif-wrap"></div>
   <div id="nametag-layer"></div>
   <div class="round-badge" id="round-badge">
@@ -611,15 +653,15 @@
   <div class="ammo-wrap" id="ammo-wrap"></div>
   <div class="reload-wrap" id="reload-wrap"><div class="reload-fill" id="reload-fill"></div></div>
   <div class="joy-base" id="joy-base"><div class="joy-stick" id="joy-stick"></div></div>
-  <div class="glowal-btn" id="glowal-btn"><div class="ic">⬜</div><div class="ct" id="glowal-count">10</div></div>
+  <div class="glowal-btn" id="glowal-btn"><div class="ic">🛡️</div><div class="ct" id="glowal-count">10</div></div>
   <div class="jump-btn" id="jump-btn">⬆</div>
-  <div class="mic-btn" id="mic-btn"><div class="ic">🎤</div><div class="mic-label" id="mic-label">BICARA</div></div>
+  <div class="mic-btn" id="mic-btn"><div class="ic">🎤</div><div class="mic-label" id="mic-label"></div></div>
   <div class="shoot-btn" id="shoot-btn"></div>
   <div class="killfeed" id="killfeed"></div>
 </div>
 <div class="overlay-msg" id="overlay-msg">
   <h1 id="overlay-title">MATI</h1>
-  <p id="overlay-sub">kamu di mati </p>
+  <p id="overlay-sub">kamu mati </p>
   <button class="menu-btn primary" id="overlay-btn" style="display:none;">Kembali</button>
 </div>
 <div class="overlay-msg" id="countdown-overlay" style="background:rgba(0,0,0,0.35);">
@@ -729,6 +771,7 @@ function addWin(ranked){
   saveSettings();
   renderRankBadge();
   checkEventProgress();
+  syncPlayerRegistry(); // biar leaderboard top rank ikut update real-time
 }
 
 /* ---------- Settings (persist via localStorage, tetap tersimpan walau keluar browser) ---------- */
@@ -964,10 +1007,10 @@ function applyMySkinToScene(){
 // Semua item disimpan di Firebase admin_data/shop_items/{id} supaya stok & harga sama buat
 // semua pemain (dan admin bisa ubah harga/stok/tambah item baru dari Admin Panel).
 const DEFAULT_SHOP_ITEMS = {
-  aimlock1: {name:'AIMLOCK Headshot (1 Match)', icon:'🎯', category:'tools', price:2000, stock:4, maxStock:4,
-    restockDay:0, desc:'Otomatis headshot 1x pertandingan penuh. Stok terbatas, restock tiap hari Minggu / oleh admin.'},
+  aimlock1: {name:'AIMLOCK Headshot (Trial)', icon:'🎯', category:'tools', price:2000, stock:4, maxStock:4,
+    restockDay:0, desc:'Auto Headshot 100% 1 Pertandingan'},
   m1887: {name:'M1887', icon:'🔫', category:'weapon', price:50000, stock:5, maxStock:5, restockDay:null,
-    desc:'Damage Besar ke lawan 1hit.'},
+    desc:'Damage Besar ke lawan.'},
   aimlocksuper: {name:'AIMLOCK VIP', icon:'🎯✨', category:'tools', price:1000000, stock:1, maxStock:1, restockDay:null,
     desc:'Auto headshot 100% Permanen. limited edition!'}
 };
@@ -1033,12 +1076,12 @@ function renderMyItemsList(){
     const queued = !!settings.aimlock1MatchQueued;
     rows.push('<div class="m-item"><span>🎯 AIMLOCK TRIAL 1 MATCH'+ot.aimlock1+')</span><span></span></div>');
     rows.push('<button class="menu-btn'+(queued?' primary':'')+'" id="btn-toggle-aimlock1" style="width:100%; font-size:12.5px; margin:6px 0 4px;">'+
-      (queued ? '✔ Akan Dipakai Match Berikutnya' : 'Pakai di Match Berikutnya')+'</button>');
+      (queued ? '⏱️' WAKTU TRIAL SUDAH HABIS: 'Pakai di Match Berikutnya')+'</button>');
   }
   if(ot.m1887){
     rows.push('<div class="m-item"><span>🔫 M1887 SHOOTGUN</span><span class="m-check">✅</span></div>');
   }
-  wrap.innerHTML = rows.length ? rows.join('') : 'Belum punya item. Beli di 🛒 Shop &gt; Item / Senjata.';
+  wrap.innerHTML = rows.length ? rows.join('') : 'Belum punya item.';
   const toggleBtn = document.getElementById('btn-toggle-aimlock1');
   if(toggleBtn){
     toggleBtn.addEventListener('click', ()=>{
@@ -1073,7 +1116,7 @@ function renderToolShop(){
     card.className = 'tool-card';
     const stockText = it.stock>0 ? ('Stok: '+it.stock) : 'Stok Habis';
     let btnLabel;
-    if(ownedFlag) btnLabel = '✔ Dimiliki';
+    if(ownedFlag) btnLabel = '✔️ Dimiliki';
     else if(it.stock<=0) btnLabel = 'Stok Habis';
     else btnLabel = '🪙 '+it.price.toLocaleString('id-ID')+' - Beli'+(isConsumable&&ownedCount?(' ('+ownedCount+' dimiliki)'):'');
     card.innerHTML = `<div class="ticon">${it.icon||'🎒'}</div>
@@ -1135,9 +1178,33 @@ function startOnlinePlayersListener(){
     onlinePlayersCache = snap.val() || {};
     renderOnlinePanel();
     renderInviteOnlineList();
+    if(document.getElementById('screen-leaderboard').classList.contains('active')) renderLeaderboard();
   });
   setInterval(()=>{ if(!isAdmin()) syncPlayerRegistry(); renderOnlinePanel(); renderInviteOnlineList(); }, 15000);
+  // Leaderboard real-time: refresh tampilan tiap 3 detik selagi layarnya lagi dibuka.
+  setInterval(()=>{ if(document.getElementById('screen-leaderboard').classList.contains('active')) renderLeaderboard(); }, 3000);
 }
+/* ---------- Leaderboard real-time (top headshot / rank / coin, admin tidak termasuk) ---------- */
+function renderLeaderboard(){
+  const entries = Object.keys(onlinePlayersCache)
+    .map(key=>({key, ...onlinePlayersCache[key]}))
+    .filter(e=>e && e.name);
+  const byHs = entries.slice().sort((a,b)=>(b.headshotTotal||0)-(a.headshotTotal||0)).slice(0,5);
+  const byRank = entries.slice().sort((a,b)=>(b.totalWins||0)-(a.totalWins||0)).slice(0,5);
+  const byCoin = entries.slice().sort((a,b)=>(b.coins||0)-(a.coins||0)).slice(0,5);
+  fillLbList('lb-headshot-list', byHs, e=>(e.headshotTotal||0)+' HS');
+  fillLbList('lb-rank-list', byRank, e=>{ const r=getRank(e.totalWins||0); return r.icon+' '+r.name; });
+  fillLbList('lb-coin-list', byCoin, e=>'🪙 '+(e.coins||0));
+}
+function fillLbList(id, list, valFn){
+  const wrap = document.getElementById(id);
+  if(!wrap) return;
+  if(!list.length){ wrap.innerHTML = '<div class="wait-note">Belum ada data</div>'; return; }
+  wrap.innerHTML = list.map((e,i)=>{
+    return '<div class="lb-row'+(i===0?' top1':'')+'"><span>'+(i+1)+'. '+escapeHtml(e.name||'Player')+(i===0?' 🏆':'')+'</span><span>'+valFn(e)+'</span></div>';
+  }).join('');
+}
+document.getElementById('btn-leaderboard').addEventListener('click', ()=>{ renderLeaderboard(); showScreen('screen-leaderboard'); });
 function getOnlineEntries(excludeSelf){
   const now = Date.now();
   return Object.keys(onlinePlayersCache).filter(key=>{
@@ -1288,7 +1355,7 @@ function renderEventScreen(){
   const rankOk = (settings.totalWins||0) >= 65;
   const hsCount = Math.min(10, settings.headshotTotal||0);
   const winCount = Math.min(3, settings.wins1v1||0);
-  document.getElementById('m-rank-check').textContent = rankOk ? '✅' : '⬜';
+  document.getElementById('m-rank-check').textContent = rankOk ? '✅' : '❌';
   document.getElementById('m-rank').classList.toggle('done', rankOk);
   document.getElementById('m-hs-check').textContent = hsCount+'/10';
   document.getElementById('m-hs').classList.toggle('done', hsCount>=10);
@@ -1296,7 +1363,7 @@ function renderEventScreen(){
   document.getElementById('m-win1v1').classList.toggle('done', winCount>=3);
   const claimBtn = document.getElementById('btn-claim-rainbow');
   if(isSkinUnlocked('rainbow')){
-    claimBtn.textContent = '🌈 Baju Rainbow Terbuka!'; claimBtn.classList.add('unlocked'); claimBtn.disabled = false;
+    claimBtn.textContent = '🌈 Skin Pelangi Terbuka!'; claimBtn.classList.add('unlocked'); claimBtn.disabled = false;
   }else{
     claimBtn.textContent = '🔒 Belum Selesai'; claimBtn.classList.remove('unlocked'); claimBtn.disabled = true;
   }
@@ -1326,7 +1393,7 @@ function attachAdminDataListeners(){
   if(!fbOK) return;
   fbDb.ref('admin_data/skins').on('value', snap=>{
     const v = snap.val()||{};
-    CUSTOM_SKINS = Object.keys(v).map(k=>({id:'c_'+k, name:v[k].name, icon:v[k].icon||'🎽', color:v[k].color||0x888888, price:v[k].price||10000}));
+    CUSTOM_SKINS = Object.keys(v).map(k=>({id:'c_'+k, name:v[k].name, icon:v[k].icon||'', color:v[k].color||0x888888, price:v[k].price||10000}));
     if(document.getElementById('screen-shop').classList.contains('active')) renderShopScreen();
     if(document.getElementById('screen-admin').classList.contains('active')) renderAdminSkinList();
   });
@@ -1353,7 +1420,7 @@ document.getElementById('admin-skin-add').addEventListener('click', ()=>{
   if(!fbOK){ alert('Firebase tidak aktif, gak bisa nambah skin.'); return; }
   const name = document.getElementById('admin-skin-name').value.trim();
   if(!name) return;
-  const icon = document.getElementById('admin-skin-icon').value.trim() || '🎽';
+  const icon = document.getElementById('admin-skin-icon').value.trim() || '';
   const colorHex = document.getElementById('admin-skin-color').value || '#888888';
   const price = parseInt(document.getElementById('admin-skin-price').value) || 10000;
   const color = parseInt(colorHex.replace('#',''),16);
@@ -1982,6 +2049,10 @@ function makePlayerObj(id, name, colorHex, isBot, isRemote){
     animT:0, shootRecoil:0, deathT:0,
     jumpY:0, velY:0,
     lastShotAt:0,
+    // Clash Squad: status dirubuhkan (knock) & progres dibangkitkan
+    knocked:false, reviveProgress:0,
+    // animasi jarak jauh (Mabar): kapan terakhir kelihatan bergerak/menembak lewat jaringan
+    remoteMoveUntil:0, _lastShotTs:0, _lastJumpTs:0,
     // bot AI
     botTimer: 0, botStrafeDir: Math.random()>0.5?1:-1,
   };
@@ -2101,6 +2172,7 @@ document.getElementById('glowal-btn').addEventListener('click', placeGlowal);
 function doJump(){
   const p = players[localId];
   if(!p || !p.alive || !matchStarted) return;
+  if(p.knocked) return; // dirubuhkan (Clash Squad) -- tidak bisa lompat
   if(p.jumpY>0.01) return; // tidak bisa lompat lagi selagi di udara
   p.velY = 4.8; // lompat tidak terlalu tinggi
   if(mode==='online' && myFbRef){ myFbRef.update({jp: Date.now()}); } // broadcast lompatan agar terlihat oleh semua player
@@ -2120,6 +2192,7 @@ function placeGlowal(){
 }
 function placeGlowalFor(p){
   if(!p || !p.alive || matchOver || !matchStarted) return;
+  if(p.knocked) return; // dirubuhkan (Clash Squad) -- tidak bisa pasang glowal
   if(p.glowalCharges<=0) return;
   p.glowalCharges--;
   if(p.id===localId) document.getElementById('glowal-count').textContent = p.glowalCharges;
@@ -2174,6 +2247,7 @@ const SHOT_COOLDOWN = 0.5; // jeda tembakan 0,5 detik
 function fireShot(dragDist){
   const p = players[localId];
   if(!p || !p.alive || matchOver || !matchStarted) return;
+  if(p.knocked) return; // dirubuhkan (Clash Squad) -- tidak bisa menembak
   if(p.reloading) return;
   if(p.ammo<=0) return;
   const nowT = performance.now()/1000;
@@ -2185,6 +2259,8 @@ function fireShot(dragDist){
   p.shootRecoil = 1;
   updateAmmoUI();
   playSound('shoot');
+  // FIX animasi Mabar: siarkan momen menembak biar pemain lain lihat animasi tangan kita menembak
+  if(mode==='online' && myFbRef){ myFbRef.update({sh: Date.now()}); }
 
   // raycast dari tengah layar (crosshair)
   raycaster.setFromCamera({x:0,y:0}, camera);
@@ -2311,13 +2387,22 @@ function applyHit(target, hitPart, dragDist, fromRemote, shotDist, shooter){
   if(headshot){
     playSound('headshot'); notifyHeadshot(shooter||players[localId], target);
     settings.headshotTotal = (settings.headshotTotal||0)+1; saveSettings(); checkEventProgress();
+    syncPlayerRegistry(); // biar leaderboard top headshot ikut update real-time
   }
   if(target.id===localId){ updateLocalHPUI(); }
   if(mode==='online' && !fromRemote){
     reportHitOnline(target.id, dmg, headshot);
   }
-  if(target.hp<=0 && target.alive){
-    killPlayer(target, shooter||players[localId], headshot);
+  processLethalIfNeeded(target, shooter||players[localId], headshot);
+}
+
+// Sekarat -> mati atau (khusus Clash Squad) dirubuhkan dulu (knock) sebelum benar-benar mati.
+function processLethalIfNeeded(target, shooter, headshot){
+  if(target.hp>0 || !target.alive) return;
+  if(matchConfig.type==='clash' && target.team && !target.knocked){
+    knockPlayer(target, shooter);
+  }else{
+    killPlayer(target, shooter, headshot);
   }
 }
 
@@ -2353,14 +2438,17 @@ function updateAmmoUI(){
 }
 function updateLocalHPUI(){
   const p = players[localId]; if(!p) return;
-  document.getElementById('hp-fill').style.width = Math.max(0,(p.hp/300*100))+'%';
-  document.getElementById('hp-num').textContent = Math.max(0,p.hp)+'/300';
+  const maxHp = p.knocked ? 200 : 300;
+  document.getElementById('hp-fill').style.width = Math.max(0,(p.hp/maxHp*100))+'%';
+  document.getElementById('hp-num').textContent = Math.max(0,p.hp)+'/'+maxHp;
+  document.getElementById('hp-fill').classList.toggle('knocked', !!p.knocked);
 }
 
 /* ================= DEATH / SPECTATE / VICTORY ================= */
 let spectateTarget = null;
 function killPlayer(target, killer, wasHeadshot){
   target.alive = false;
+  target.knocked = false;
   target.deathT = 0.001;
   target.diedByHeadshot = !!wasHeadshot;
   addKillFeed((killer? killer.name : '???') + ' mengeliminasi ' + target.name);
@@ -2375,6 +2463,7 @@ function killPlayer(target, killer, wasHeadshot){
   }
 
   if(target.id===localId){
+    restoreKnockControls();
     showDeathNotif(wasHeadshot);
     if(matchConfig.type==='mabar'){
       enterMabarRespawn();
@@ -2389,7 +2478,13 @@ function killPlayer(target, killer, wasHeadshot){
 }
 function enterSpectate(killer, showOverlay){
   if(showOverlay===undefined) showOverlay = true;
-  spectateTarget = killer && killer.alive ? killer : findAnyAlive(localId);
+  const me = players[localId];
+  // Clash Squad: pemain gugur cuma boleh menonton rekan satu tim, bukan musuh yang mengalahkan.
+  if(matchConfig.type==='clash' && me && me.team){
+    spectateTarget = findTeammateAlive(me.team, localId);
+  }else{
+    spectateTarget = killer && killer.alive ? killer : findAnyAlive(localId);
+  }
   enterSpectateHudMode();
   if(!showOverlay) return;
   const ov = document.getElementById('overlay-msg');
@@ -2398,6 +2493,81 @@ function enterSpectate(killer, showOverlay){
   document.getElementById('overlay-sub').textContent = spectateTarget ? ('Menonton ' + spectateTarget.name + '...') : 'Menunggu hasil pertandingan...';
   document.getElementById('overlay-btn').style.display = 'none';
   ov.classList.add('show','spectate-death');
+}
+function findTeammateAlive(team, excludeId){
+  let fallback = null;
+  for(const id in players){
+    if(id===excludeId) continue;
+    const p = players[id];
+    if(p.team!==team || !p.alive) continue;
+    if(!p.knocked) return p;
+    if(!fallback) fallback = p; // kalau semua rekan lagi dirubuhkan, tetap nonton salah satu
+  }
+  return fallback;
+}
+
+/* ---- Clash Squad: sistem KNOCK & REVIVE ----
+   Kalau HP rekan tim habis, dia tidak langsung mati -- cuma dirubuhkan (knock, HP 200),
+   merangkak pelan, tidak bisa menembak/lompat/pasang glowal. Rekan satu tim yang masih berdiri
+   & mendekat 5 detik terus-menerus bisa membangkitkannya lagi. Kalau ditembak lagi selagi
+   dirubuhkan, baru benar-benar mati. Kalau seluruh tim dirubuhkan semua, tim itu kalah. */
+function knockPlayer(target, killer){
+  target.knocked = true;
+  target.reviveProgress = 0;
+  target.hp = 200;
+  addBottomNotif((killer? killer.name : '???') + ' merubuhkan ' + target.name);
+  if(target.id===localId){
+    updateLocalHPUI();
+    document.getElementById('shoot-btn').style.display = 'none';
+    document.getElementById('glowal-btn').style.display = 'none';
+    document.getElementById('jump-btn').style.display = 'none';
+    document.getElementById('knock-tag').classList.add('show');
+  }
+}
+function revivePlayer(kp){
+  kp.knocked = false;
+  kp.hp = 200;
+  kp.reviveProgress = 0;
+  addBottomNotif(kp.name + ' dibangkitkan!');
+  if(kp.id===localId){
+    updateLocalHPUI();
+    restoreKnockControls();
+    if(mode==='online' && myFbRef){ myFbRef.update({h:kp.hp, k:false}); }
+  }
+  checkVictoryCondition();
+}
+function restoreKnockControls(){
+  document.getElementById('shoot-btn').style.display = '';
+  document.getElementById('glowal-btn').style.display = '';
+  document.getElementById('jump-btn').style.display = '';
+  document.getElementById('knock-tag').classList.remove('show');
+}
+function updateKnockRevive(dt){
+  if(matchConfig.type!=='clash' || !matchStarted || matchOver) return;
+  const REVIVE_RADIUS = 2.6, REVIVE_TIME = 5;
+  for(const id in players){
+    const kp = players[id];
+    if(!kp.alive || !kp.knocked) continue;
+    let nearAlly = false;
+    for(const oid in players){
+      if(oid===id) continue;
+      const ally = players[oid];
+      if(!ally.alive || ally.knocked || ally.team!==kp.team) continue;
+      if(ally.pos.distanceTo(kp.pos) < REVIVE_RADIUS){ nearAlly = true; break; }
+    }
+    if(nearAlly){
+      kp.reviveProgress = Math.min(1, (kp.reviveProgress||0) + dt/REVIVE_TIME);
+      if(kp.reviveProgress>=1){ revivePlayer(kp); continue; }
+    }else{
+      kp.reviveProgress = Math.max(0, (kp.reviveProgress||0) - dt/2);
+    }
+    if(kp.id===localId){
+      const tag = document.getElementById('knock-tag');
+      tag.textContent = nearAlly
+        ? '🤝 SEDANG DIBANGKITKAN... ' + Math.floor((kp.reviveProgress||0)*100) + '%'
+        : '⚠️ KAMU DIRUBUHKAN — merangkak ke rekan tim buat dibangkitkan';
+    }
+  }
 }
 function enterMabarRespawn(){
   const ov = document.getElementById('overlay-msg');
@@ -2430,7 +2600,7 @@ function showDeathNotif(wasHeadshot){
   const wrap = document.getElementById('death-notif');
   const el = document.createElement('div');
   el.className = 'dn-item ' + (wasHeadshot ? 'hs' : 'elim');
-  el.textContent = wasHeadshot ? '💀 HEADSHOT' : '☠️ ELIMINASI';
+  el.textContent = wasHeadshot ? '🎯 HEADSHOT ' : '☠️ TERELIMINASI';
   wrap.innerHTML = '';
   wrap.appendChild(el);
   setTimeout(()=>{ if(el.parentNode) el.remove(); }, 2600);
@@ -2438,12 +2608,14 @@ function showDeathNotif(wasHeadshot){
 function respawnLocalPlayer(){
   const p = players[localId]; if(!p) return;
   p.hp=300; p.alive=true; p.ammo=3; p.reloading=false; p.jumpY=0; p.velY=0; p.deathT=0;
+  p.knocked=false; p.reviveProgress=0;
   p.activeWalls.forEach(w=>scene.remove(w)); p.activeWalls=[]; p.glowalCharges=10;
   p.mesh.userData.hips.rotation.x = 0; p.mesh.userData.hips.position.y = 0.95;
   resetSpawnPosition(p);
+  restoreKnockControls();
   updateAmmoUI(); updateLocalHPUI();
   document.getElementById('glowal-count').textContent = p.glowalCharges;
-  if(mode==='online' && myFbRef) myFbRef.update({x:p.pos.x, z:p.pos.z, h:p.hp, a:true});
+  if(mode==='online' && myFbRef) myFbRef.update({x:p.pos.x, z:p.pos.z, h:p.hp, a:true, k:false});
 }
 function resetSpawnPosition(p){
   p.parachuting = false; p.hasWeapon = true;
@@ -2474,10 +2646,13 @@ function checkVictoryCondition(){
   if(matchOver) return;
   if(matchConfig.type==='mabar') return; // santai, tidak ada kondisi menang
   if(matchConfig.type==='clash'){
-    const aliveGood = aliveList.some(p=>p.team==='good');
-    const aliveEvil = aliveList.some(p=>p.team==='evil');
-    if(!aliveGood || !aliveEvil){
-      const winnerTeam = aliveGood ? 'good' : (aliveEvil ? 'evil' : null);
+    // Tim dianggap kalah kalau tidak ada satupun anggotanya yang masih berdiri (hidup & tidak
+    // dirubuhkan) -- pemain yang dirubuhkan (knock) masih terhitung "ada" tapi tidak bisa
+    // menyelamatkan tim, kecuali sempat dibangkitkan rekan sebelum semua tim jadi dirubuhkan.
+    const standingGood = aliveList.some(p=>p.team==='good' && !p.knocked);
+    const standingEvil = aliveList.some(p=>p.team==='evil' && !p.knocked);
+    if(!standingGood || !standingEvil){
+      const winnerTeam = standingGood ? 'good' : (standingEvil ? 'evil' : null);
       handleClashRoundEnd(winnerTeam);
     }
     return;
@@ -2534,9 +2709,11 @@ function startNextRoundOffline(){
 }
 function resetPlayerForNewRound(p){
   p.hp=300; p.alive=true; p.ammo=3; p.reloading=false; p.jumpY=0; p.velY=0; p.deathT=0;
+  p.knocked=false; p.reviveProgress=0;
   p.activeWalls.forEach(w=>scene.remove(w)); p.activeWalls=[]; p.glowalCharges=10;
   p.mesh.userData.hips.rotation.x = 0; p.mesh.userData.hips.position.y = 0.95;
   resetSpawnPosition(p);
+  if(p.id===localId){ restoreKnockControls(); if(mode==='online' && myFbRef){ myFbRef.update({k:false}); } }
 }
 function formatScoreText(scores){
   return Object.keys(scores).map(id=>(players[id]?players[id].name:id)+':'+scores[id]).join('  -  ');
@@ -2623,9 +2800,9 @@ function endClashMatchFinal(winnerTeam){
   const iWon = winnerTeam==='good';
   if(iWon){ addWin(matchConfig.ranked); playSound('win'); }
   const ov = document.getElementById('overlay-msg');
-  document.getElementById('overlay-title').textContent = iWon? 'VICTORY':'GUGUR';
+  document.getElementById('overlay-title').textContent = iWon? 'VICTORY':'DEFEAT';
   document.getElementById('overlay-title').className = iWon? 'victory':'dead';
-  document.getElementById('overlay-sub').textContent = winnerTeam ? (teamLabel(winnerTeam)+' memenangkan pertandingan • Skor ['+(roundScores.good||0)+'-'+(roundScores.evil||0)+']') : 'Pertandingan berakhir seri';
+  document.getElementById('overlay-sub').textContent = winnerTeam ? (teamLabel(winnerTeam)+' memenangkan pertandingan, Skor ['+(roundScores.good||0)+'-'+(roundScores.evil||0)+']') : 'Pertandingan berakhir seri';
   document.getElementById('overlay-btn').style.display = 'inline-block';
   ov.classList.add('show');
   cleanupOnlineRoom();
@@ -2731,7 +2908,7 @@ function updateKillCountUI(){
 }
 function flashLootHint(){
   const hint = document.getElementById('loot-hint');
-  hint.textContent = '🔫 Belum ada senjata! Cari loot dulu.';
+  hint.textContent = 'Belum ada senjata! Cari dulu.';
   hint.classList.add('show');
   clearTimeout(flashLootHint._t);
   flashLootHint._t = setTimeout(()=>hint.classList.remove('show'), 1400);
@@ -2755,6 +2932,7 @@ document.getElementById('exit-game-btn').addEventListener('click', ()=>{
 /* ================= BOT AI (offline) ================= */
 function updateBot(bot, dt){
   if(!bot.alive || !matchStarted) return;
+  if(bot.knocked) return; // dirubuhkan (Clash Squad) -- diam, tidak bisa gerak/menyerang
   if(bot.parachuting) return; // masih melayang, belum bisa bergerak cari musuh
   if(matchConfig.type==='br' && !bot.hasWeapon){
     // cari loot terdekat dulu sebelum menyerang
@@ -2858,7 +3036,7 @@ function botShoot(bot, dist, target){
     spawnDamageNumber(target, dmg, headshot);
     if(headshot){ playSound('headshot'); notifyHeadshot(bot, target); }
     if(target.id===localId) updateLocalHPUI();
-    if(target.hp<=0 && target.alive){ killPlayer(target, bot, headshot); }
+    processLethalIfNeeded(target, bot, headshot);
   }
   if(bot.ammo<=0) startReload(bot);
 }
@@ -2879,11 +3057,11 @@ function updateLocalMovement(dt){
     move.addScaledVector(forward, -moveY);
     if(move.lengthSq()>0){
       move.normalize();
-      const speed = 4.5;
+      const speed = p.knocked ? 1.3 : 4.5; // merangkak pelan selagi dirubuhkan (Clash Squad)
       p.pos.addScaledVector(move, speed*dt*Math.min(mag,1));
       p.yaw = Math.atan2(move.x, move.z);
     }
-    p.walkPhase += dt*7;
+    p.walkPhase += dt*(p.knocked?4:7);
   }
   // batas area
   const R=112;
@@ -2932,6 +3110,9 @@ function clearNametags(){
 }
 
 /* ================= ANIMATION (procedural) ================= */
+function isRemoteMovingNow(p){
+  return !!(p.remoteMoveUntil && performance.now()/1000 < p.remoteMoveUntil);
+}
 function animateCharacter(p, dt){
   const u = p.mesh.userData;
   if(!p.alive){
@@ -2943,6 +3124,21 @@ function animateCharacter(p, dt){
     u.hips.position.y = Math.max(0.15, 0.95 - fall*0.85);
     return;
   }
+  if(p.knocked){
+    // Clash Squad: dirubuhkan -- merangkak pelan, tidak berdiri tegak
+    p.mesh.position.copy(p.pos);
+    p.mesh.position.y = 0;
+    p.mesh.rotation.y = p.yaw;
+    p.mesh.scale.setScalar(1);
+    const movingK = (p.id===localId) ? Math.hypot(joyState.dx,joyState.dy)>0.12 : (p.isBot || isRemoteMovingNow(p));
+    if(movingK) p.walkPhase += dt*4;
+    u.hips.rotation.x = (Math.PI/2)*0.55;
+    u.hips.position.y = 0.32;
+    const crawl = Math.sin(p.walkPhase)*0.32;
+    u.armL.rotation.x = crawl; u.armR.rotation.x = -crawl;
+    u.legL.rotation.x = -crawl*0.6; u.legR.rotation.x = crawl*0.6;
+    return;
+  }
   updateJumpPhysics(p, dt);
   p.mesh.position.copy(p.pos);
   p.mesh.position.y += p.jumpY + (p.parachuting? p.chuteY : 0);
@@ -2950,7 +3146,10 @@ function animateCharacter(p, dt){
   // efek parasut: sedikit condong & lebih kecil selama melayang turun
   p.mesh.scale.setScalar(p.parachuting? 0.9 : 1);
 
-  const isMoving = (p.id===localId) ? Math.hypot(joyState.dx,joyState.dy)>0.12 : (p.isBot);
+  // FIX animasi Mabar: player online lain sekarang ikut animasi jalan kalau posisinya
+  // barusan berubah lewat jaringan (bukan cuma bot yang animasinya jalan seperti sebelumnya).
+  const isMoving = (p.id===localId) ? Math.hypot(joyState.dx,joyState.dy)>0.12 : (p.isBot || isRemoteMovingNow(p));
+  if(p.id!==localId && !p.isBot && isMoving){ p.walkPhase += dt*7; }
   const swing = Math.sin(p.walkPhase) * (isMoving?0.55:0.05);
   u.legL.rotation.x = swing;
   u.legR.rotation.x = -swing;
@@ -3016,6 +3215,7 @@ function animate(){
     // menyerang walau mode==='online' -- sebelumnya cek mode==='offline' bikin bot itu diam total
     // di server online karena updateBot() tidak pernah dipanggil buat mereka.
     for(const id in players){ if(players[id].isBot) updateBot(players[id], dt); }
+    updateKnockRevive(dt);
     for(const id in players){ animateCharacter(players[id], dt); }
     updateCameraFollow();
     updateCrosshair();
@@ -3155,7 +3355,7 @@ document.querySelectorAll('[data-join]').forEach(btn=>{
   });
 });
 
-let currentServerPath=null, currentServerType=null, waitChosenRounds=4, matchStartedOnline=false, waitFillBots=true;
+let currentServerPath=null, currentServerType=null, waitChosenRounds=4, matchStartedOnline=false, waitFillBots=true, waitPlayerCount=0;
 document.getElementById('br-bot-yes').addEventListener('click', ()=>{
   waitFillBots = true;
   document.getElementById('br-bot-yes').classList.add('sel');
@@ -3172,7 +3372,7 @@ function enterWaitRoom(path, type){
   currentServerPath = path; currentServerType = type; matchStartedOnline = false;
   showScreen('screen-mp-wait');
   document.getElementById('wait-title').textContent =
-    type==='duel' ? 'SERVER DUEL' : type==='br' ? 'SERVER BATTLE ROYALE' : 'SERVER MABAR (SANTAI)';
+    type==='duel' ? 'SERVER DUEL' : type==='br' ? 'SERVER BATTLE ROYALE' : type==='clash' ? 'SERVER MABAR CLASH SQUAD' : 'SERVER MABAR (SANTAI)';
 
   const roundsWrap = document.getElementById('rounds-pick');
   roundsWrap.innerHTML='';
@@ -3197,6 +3397,7 @@ function enterWaitRoom(path, type){
   botPick.style.display = (type==='br') ? 'flex' : 'none';
   document.getElementById('br-bot-yes').classList.add('sel');
   document.getElementById('br-bot-no').classList.remove('sel');
+  document.getElementById('clash-note').style.display = (type==='clash') ? 'block' : 'none';
 
   // Fitur undang player online -- sekarang tersedia di semua tipe server (Duel, BR, Mabar),
   // bukan cuma server Mabar aja.
@@ -3242,6 +3443,7 @@ function attachPhaseListener(){
 function renderWaitList(obj){
   const wrap = document.getElementById('wait-players');
   const ids = Object.keys(obj);
+  waitPlayerCount = ids.length;
   wrap.innerHTML = ids.map(id=>{
     const d = obj[id]||{};
     const isMe = id===localId;
@@ -3282,20 +3484,21 @@ function beginOnlineMatchFromWait(){
   mode = 'online';
   matchConfig = {
     type: currentServerType,
-    totalRounds: currentServerType==='duel' ? waitChosenRounds : 1,
+    totalRounds: currentServerType==='duel' ? waitChosenRounds : (currentServerType==='clash' ? 6 : 1),
     online: true,
     ranked: currentServerType!=='mabar'
   };
   consumeAimlock1IfQueued();
-  roundScores = {}; roundN = 1;
+  roundScores = (matchConfig.type==='clash') ? { good:0, evil:0 } : {}; roundN = 1;
 
   if(matchConfig.type==='br') buildBRHouses();
   const me = makePlayerObj(localId, settings.name, getMySkinColor(), false, false);
+  if(matchConfig.type==='clash') me.team = 'good';
   resetSpawnPosition(me);
   me.weaponId = myWeaponId();
   players[localId] = me;
   applyMySkinToScene();
-  myFbRef.update({x:me.pos.x, z:me.pos.z, h:me.hp, a:true});
+  myFbRef.update({x:me.pos.x, z:me.pos.z, h:me.hp, a:true, k:false});
 
   playersRef.off('value');
   attachOnlineGameplayListeners();
@@ -3314,6 +3517,21 @@ function beginOnlineMatchFromWait(){
     }
   }
 
+  // Room Mabar Clash Squad: semua pemain nyata jadi satu tim ('good'), CPU pengisi tim lawan
+  // ('evil') jumlahnya menyesuaikan jumlah pemain nyata yang gabung -- misal 3 pemain = 3 CPU (3v3).
+  if(matchConfig.type==='clash'){
+    const usedNames = new Set(Object.values(players).map(p=>p.name));
+    const evilColors = [0xd43b3b,0x8b3bd4,0xd48b3b,0xd43b8f,0x6a3bd4,0xd46a3b,0x3b3bd4,0xd4d13b];
+    const botCount = Math.max(1, waitPlayerCount||1);
+    for(let i=0;i<botCount;i++){
+      const bot = makePlayerObj('clash_bot_'+i, randomBotName(usedNames), evilColors[i%evilColors.length], true, false);
+      bot.team = 'evil';
+      bot.weaponId = myWeaponId();
+      resetSpawnPosition(bot);
+      players['clash_bot_'+i] = bot;
+    }
+  }
+
   enterGame();
   updateRoundBadge();
   if(matchConfig.type==='mabar') initVoiceChat();
@@ -3328,6 +3546,9 @@ function attachOnlineGameplayListeners(){
     applySkinToMesh(rp, d.sk||'default');
     rp.pos.set(d.x||0, 0, d.z||0);
     rp.yaw = d.r||0; rp.hp = d.h!==undefined?d.h:300; rp.alive = d.a!==false;
+    rp.knocked = !!d.k;
+    // Room Mabar Clash Squad: semua pemain nyata (bukan CPU) selalu satu tim ('good').
+    if(matchConfig.type==='clash') rp.team = 'good';
     if(matchConfig.type==='br'){ rp.parachuting=true; rp.chuteY=42+Math.random()*8; rp.hasWeapon=false; if(rp.mesh.userData.gun) rp.mesh.userData.gun.visible=false; }
     players[snap.key] = rp;
     checkVictoryCondition();
@@ -3335,15 +3556,26 @@ function attachOnlineGameplayListeners(){
   playersRef.on('child_changed', snap=>{
     const d = snap.val(); const rp = players[snap.key];
     if(!rp || snap.key===localId) return;
-    rp.pos.set(d.x||0,0,d.z||0); rp.yaw = d.r||0;
+    const newX = d.x||0, newZ = d.z||0;
+    // FIX animasi Mabar: deteksi pergerakan pemain lain dari perubahan posisi jaringan,
+    // supaya animasi jalan mereka ikut jalan (sebelumnya cuma bot yang animasinya jalan).
+    const movedDist = Math.hypot(newX-rp.pos.x, newZ-rp.pos.z);
+    if(movedDist>0.015){ rp.remoteMoveUntil = performance.now()/1000 + 0.45; }
+    rp.pos.set(newX,0,newZ); rp.yaw = d.r||0;
     if(d.sk!==undefined && d.sk!==rp.skinId){ applySkinToMesh(rp, d.sk); }
     if(rp.alive && d.a===false){ rp.alive=false; rp.deathT=0.001; addKillFeed(rp.name+' gugur'); checkVictoryCondition(); }
     if(!rp.alive && d.a===true){ rp.alive=true; rp.deathT=0; rp.mesh.userData.hips.rotation.x=0; rp.mesh.userData.hips.position.y=0.95; }
+    if(d.k!==undefined && d.k!==rp.knocked){ rp.knocked = !!d.k; rp.reviveProgress=0; }
     rp.hp = d.h!==undefined?d.h:rp.hp;
     // lompatan pemain lain ikut ditampilkan (terlihat + animasi)
     if(d.jp && d.jp!==rp._lastJumpTs){
       rp._lastJumpTs = d.jp;
       if(rp.jumpY<=0.01){ rp.velY = 4.8; }
+    }
+    // FIX animasi Mabar: pemain lain menembak juga ikut memicu animasi tangan menembak (recoil)
+    if(d.sh && d.sh!==rp._lastShotTs){
+      rp._lastShotTs = d.sh;
+      rp.shootRecoil = 1;
     }
   });
   playersRef.on('child_removed', snap=>{
@@ -3388,9 +3620,14 @@ function attachOnlineGameplayListeners(){
       updateLocalHPUI();
       myFbRef.update({h: me2.hp});
       if(me2.hp<=0){
-        me2.alive=false; me2.deathT=0.001; me2.diedByHeadshot=h.hs;
-        myFbRef.update({a:false});
-        killPlayer(me2, players[h.s], h.hs);
+        if(matchConfig.type==='clash' && me2.team && !me2.knocked){
+          knockPlayer(me2, players[h.s]);
+          myFbRef.update({h: me2.hp, k:true});
+        }else{
+          me2.alive=false; me2.deathT=0.001; me2.diedByHeadshot=h.hs;
+          myFbRef.update({a:false, k:false});
+          killPlayer(me2, players[h.s], h.hs);
+        }
       }
     }
     snap.ref.remove();
