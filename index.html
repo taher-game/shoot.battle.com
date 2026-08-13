@@ -391,6 +391,7 @@
   <div class="logo" style="font-size:24px;">PILIH MODE</div>
   <button class="menu-btn primary" id="btn-offline-duel">⚔ Duel 1v1</button>
   <button class="menu-btn danger" id="btn-offline-br">🔥 Battle Royale </button>
+  <button class="menu-btn" id="btn-offline-clash" style="border-color:rgba(255,157,59,0.5);">🛡️ Clash Squad 4v4</button>
 </div>
 
 <!-- OFFLINE DUEL SUBMODE -->
@@ -942,12 +943,21 @@ function setShopTab(tab){
 }
 document.getElementById('shop-tab-baju').addEventListener('click', ()=>setShopTab('baju'));
 document.getElementById('shop-tab-item').addEventListener('click', ()=>setShopTab('item'));
+function skinDefById(skinId){
+  if(skinId==='rainbow') return RAINBOW_SKIN;
+  return allSkinDefs().find(s=>s.id===skinId) || SKINS[0];
+}
+function applySkinToMesh(p, skinId){
+  if(!p || !p.mesh) return;
+  const def = skinDefById(skinId||'default');
+  p.skinId = def.id;
+  if(p.mesh.userData.clothMat) p.mesh.userData.clothMat.color.setHex(def.color);
+  if(p.mesh.userData.accentMesh) p.mesh.userData.accentMesh.visible = (def.id!=='default');
+}
 function applyMySkinToScene(){
   const p = players[localId];
   if(!p || !p.mesh) return;
-  const def = getMySkinDef();
-  p.mesh.userData.clothMat.color.setHex(def.color);
-  if(p.mesh.userData.accentMesh) p.mesh.userData.accentMesh.visible = (def.id!=='default');
+  applySkinToMesh(p, settings.selectedSkin);
 }
 
 /* ---------- Shop: Item / Tools & Senjata (stok global, sinkron Firebase) ---------- */
@@ -1006,6 +1016,7 @@ function maybeAutoRestock(){
   });
 }
 function ownedToolsSafe(){ settings.ownedTools = settings.ownedTools||{}; return settings.ownedTools; }
+function myWeaponId(){ return ownedToolsSafe().m1887 ? 'm1887' : 'default'; }
 function hasAutoHeadshot(){
   const ot = ownedToolsSafe();
   return !!(settings.autoHeadshot || ot.aimlocksuper || (matchConfig && matchConfig.aimlock1MatchActive));
@@ -1864,10 +1875,17 @@ function createCharacter(colorHex){
 
 /* ================= BATTLE ROYALE: RUMAH & LOOT SENJATA ================= */
 let brHouseGroup = null;
-let brLoot = []; // {mesh, pos, taken}
+let brLoot = []; // {mesh, pos, taken, weaponId}
 const BR_HOUSE_POS = [ {x:-45,z:-45}, {x:50,z:0}, {x:-20,z:55} ];
+function makeLootMesh(isM1887){
+  return new THREE.Mesh(new THREE.BoxGeometry(0.55,0.2,0.18),
+    new THREE.MeshStandardMaterial(isM1887 ? {color:0xff5a3b, emissive:0x5a1400} : {color:0xffcf3b, emissive:0x442a00}));
+}
 function buildBRHouses(){
   clearBRLoot();
+  // Loot M1887 cuma muncul di lapangan kalau kita sendiri sudah punya senjata itu -- biar bot
+  // juga "setara" & match terasa konsisten dgn status kepemilikan senjata pemain.
+  const hasM1887 = !!ownedToolsSafe().m1887;
   brHouseGroup = new THREE.Group();
   const wallMat = new THREE.MeshStandardMaterial({color:0xb7a888, roughness:0.9});
   const roofMat = new THREE.MeshStandardMaterial({color:0x7a3a2a, roughness:0.8});
@@ -1886,11 +1904,12 @@ function buildBRHouses(){
     for(let i=0;i<lootCount;i++){
       const lx = hp.x + (Math.random()-0.5)*10;
       const lz = hp.z + (Math.random()-0.5)*10;
-      const lootMesh = new THREE.Mesh(new THREE.BoxGeometry(0.55,0.2,0.18), new THREE.MeshStandardMaterial({color:0xffcf3b, emissive:0x442a00}));
+      const isM1887 = hasM1887 && Math.random()<0.25;
+      const lootMesh = makeLootMesh(isM1887);
       lootMesh.position.set(lx, 0.35, lz);
       lootMesh.rotation.y = Math.random()*Math.PI;
       scene.add(lootMesh);
-      brLoot.push({mesh:lootMesh, pos:new THREE.Vector3(lx,0,lz), taken:false});
+      brLoot.push({mesh:lootMesh, pos:new THREE.Vector3(lx,0,lz), taken:false, weaponId:isM1887?'m1887':'default'});
     }
   });
   // Loot tambahan tersebar di lapangan terbuka -- jadi tidak cuma di dalam/sekitar rumah
@@ -1898,11 +1917,12 @@ function buildBRHouses(){
   for(let i=0;i<OPEN_LOOT_COUNT;i++){
     const ang = Math.random()*Math.PI*2, dist = 14 + Math.random()*85;
     const lx = Math.cos(ang)*dist, lz = Math.sin(ang)*dist;
-    const lootMesh = new THREE.Mesh(new THREE.BoxGeometry(0.55,0.2,0.18), new THREE.MeshStandardMaterial({color:0xffcf3b, emissive:0x442a00}));
+    const isM1887 = hasM1887 && Math.random()<0.18;
+    const lootMesh = makeLootMesh(isM1887);
     lootMesh.position.set(lx, 0.35, lz);
     lootMesh.rotation.y = Math.random()*Math.PI;
     scene.add(lootMesh);
-    brLoot.push({mesh:lootMesh, pos:new THREE.Vector3(lx,0,lz), taken:false});
+    brLoot.push({mesh:lootMesh, pos:new THREE.Vector3(lx,0,lz), taken:false, weaponId:isM1887?'m1887':'default'});
   }
   scene.add(brHouseGroup);
 }
@@ -1938,6 +1958,7 @@ function updateBRLoot(dt){
         l.taken = true;
         scene.remove(l.mesh);
         p.hasWeapon = true;
+        if(l.weaponId==='m1887'){ p.weaponId = 'm1887'; if(p.id===localId){ addBottomNotif('🔫 Dapat senjata M1887!'); } }
         if(p.mesh.userData.gun) p.mesh.userData.gun.visible = true;
         if(p.id===localId){ document.getElementById('loot-hint').classList.remove('show'); }
         break;
@@ -1953,7 +1974,7 @@ function makePlayerObj(id, name, colorHex, isBot, isRemote){
   return {
     id, name, mesh, isBot: !!isBot, isRemote: !!isRemote,
     hp: 300, alive: true, ammo: 3, reloading:false, reloadT:0, kills:0,
-    hasWeapon: true, chuteY:0, parachuting:false,
+    hasWeapon: true, chuteY:0, parachuting:false, skinId:'default',
     pos: new THREE.Vector3((Math.random()-0.5)*6, 0, (Math.random()-0.5)*6 - (isBot? -8:8)),
     yaw: 0, vel: new THREE.Vector3(),
     walkPhase: Math.random()*10,
@@ -2095,11 +2116,13 @@ function updateJumpPhysics(p, dt){
 }
 
 function placeGlowal(){
-  const p = players[localId];
+  placeGlowalFor(players[localId]);
+}
+function placeGlowalFor(p){
   if(!p || !p.alive || matchOver || !matchStarted) return;
   if(p.glowalCharges<=0) return;
   p.glowalCharges--;
-  document.getElementById('glowal-count').textContent = p.glowalCharges;
+  if(p.id===localId) document.getElementById('glowal-count').textContent = p.glowalCharges;
 
   const wallMat = new THREE.MeshStandardMaterial({color:0xdfe6df, transparent:true, opacity:0.92});
   // Glowal diperbesar agar cukup menutupi seluruh badan player dan memblokir peluru total
@@ -2112,7 +2135,7 @@ function placeGlowal(){
   wall.userData.ownerId = p.id;
   scene.add(wall);
 
-  if(mode==='online' && wallsRef){
+  if(mode==='online' && wallsRef && p.id===localId){
     const key = wallsRef.push().key;
     wall.userData.fbKey = key;
     wallsRef.child(key).set({x:wall.position.x, z:wall.position.z, ry:p.yaw, o:p.id});
@@ -2170,6 +2193,7 @@ function fireShot(dragDist){
     if(id===localId) continue;
     const target = players[id];
     if(!target.alive) continue;
+    if(p.team && target.team && target.team===p.team) continue; // jangan bisa tembak teman satu tim (Clash Squad)
     const parts = [target.mesh.userData.head, target.mesh.userData.torso];
     for(const part of parts){
       const worldPos = new THREE.Vector3();
@@ -2193,6 +2217,7 @@ function fireShot(dragDist){
       for(const id in players){
         if(id===localId) continue;
         const t=players[id]; if(!t.alive) continue;
+        if(p.team && t.team && t.team===p.team) continue; // jangan bisa tembak teman satu tim (Clash Squad)
         const wp = new THREE.Vector3(); t.mesh.userData.torso.getWorldPosition(wp);
         const sp = wp.clone().project(camera);
         const d = Math.hypot(sp.x, sp.y);
@@ -2428,6 +2453,11 @@ function resetSpawnPosition(p){
     p.pos.set(Math.cos(ang)*dist, 0, Math.sin(ang)*dist);
     p.parachuting = true; p.chuteY = 42 + Math.random()*8; p.hasWeapon = false;
     if(p.mesh && p.mesh.userData.gun) p.mesh.userData.gun.visible = false;
+  }else if(matchConfig.type==='clash'){
+    // Tim baik spawn di sebelah kanan (+X), tim jahat di sebelah kiri (-X), saling berhadapan
+    const side = p.team==='evil' ? -1 : 1;
+    p.pos.set(side*(20+Math.random()*8), 0, (Math.random()-0.5)*18);
+    p.yaw = side>0 ? -Math.PI/2 : Math.PI/2;
   }else if(p.id===localId){
     p.pos.set((Math.random()-0.5)*4, 0, 7+(Math.random()-0.5)*2);
   }else{
@@ -2443,6 +2473,15 @@ function checkVictoryCondition(){
   document.getElementById('alive-count').textContent = aliveList.length + ' tersisa';
   if(matchOver) return;
   if(matchConfig.type==='mabar') return; // santai, tidak ada kondisi menang
+  if(matchConfig.type==='clash'){
+    const aliveGood = aliveList.some(p=>p.team==='good');
+    const aliveEvil = aliveList.some(p=>p.team==='evil');
+    if(!aliveGood || !aliveEvil){
+      const winnerTeam = aliveGood ? 'good' : (aliveEvil ? 'evil' : null);
+      handleClashRoundEnd(winnerTeam);
+    }
+    return;
+  }
   if(aliveList.length<=1){
     const winner = aliveList[0]||null;
     if(matchConfig.type==='duel' && !matchConfig.online){
@@ -2504,6 +2543,15 @@ function formatScoreText(scores){
 }
 function updateRoundBadge(){
   const badge = document.getElementById('round-badge');
+  if(matchConfig.type==='clash'){
+    badge.classList.add('show');
+    document.getElementById('rb-label').textContent = 'RONDE '+roundN+'/'+matchConfig.totalRounds;
+    const scoreEl = document.getElementById('rb-score');
+    const myWins = roundScores.good||0, oppWins = roundScores.evil||0;
+    scoreEl.textContent = '['+myWins+'-'+oppWins+']';
+    scoreEl.className = 'rb-score' + (myWins>oppWins?' iwin':(myWins<oppWins?' ilose':''));
+    return;
+  }
   if(matchConfig.type!=='duel'){ badge.classList.remove('show'); return; }
   badge.classList.add('show');
   const myWins = roundScores[localId]||0;
@@ -2526,6 +2574,58 @@ function endMatchFinal(winner){
   document.getElementById('overlay-title').textContent = iWon? 'VICTORY':'GUGUR';
   document.getElementById('overlay-title').className = iWon? 'victory':'dead';
   document.getElementById('overlay-sub').textContent = winner ? ('Pemenang pertandingan: '+winner.name) : 'Pertandingan berakhir';
+  document.getElementById('overlay-btn').style.display = 'inline-block';
+  ov.classList.add('show');
+  cleanupOnlineRoom();
+}
+
+/* ---- Sistem Ronde (Clash Squad 4v4 Offline, per-tim) ---- */
+function teamLabel(team){ return team==='good' ? 'Tim Kamu' : (team==='evil' ? 'Tim Musuh' : ''); }
+function handleClashRoundEnd(winnerTeam){
+  matchOver = true;
+  if(winnerTeam) roundScores[winnerTeam] = (roundScores[winnerTeam]||0)+1;
+  updateRoundBadge(); // skor di atas-tengah update seketika, tanpa layar gelap
+  const needed = Math.ceil(matchConfig.totalRounds/2);
+  const wins = winnerTeam ? (roundScores[winnerTeam]||0) : 0;
+  const isFinal = wins>=needed || roundN>=matchConfig.totalRounds;
+  // Jeda 3 detik: layar TIDAK gelap, biar sisa pemain tetap bisa nonton momen terakhir ronde
+  setTimeout(()=>{
+    if(isFinal){
+      endClashMatchFinal(winnerTeam);
+    }else{
+      roundN++;
+      showClashRoundTransitionOverlay(winnerTeam);
+      setTimeout(()=>{ startNextRoundClash(); }, 2000);
+    }
+  }, 3000);
+}
+function showClashRoundTransitionOverlay(winnerTeam){
+  const ov = document.getElementById('overlay-msg');
+  const iWon = winnerTeam==='good';
+  document.getElementById('overlay-title').textContent = 'RONDE '+roundN;
+  document.getElementById('overlay-title').className = winnerTeam ? (iWon?'victory':'dead') : '';
+  document.getElementById('overlay-sub').textContent = (winnerTeam ? (teamLabel(winnerTeam)+' menang ronde sebelumnya') : 'Ronde seri') + ' • Skor ['+(roundScores.good||0)+'-'+(roundScores.evil||0)+']';
+  document.getElementById('overlay-btn').style.display = 'none';
+  ov.classList.add('show');
+}
+function startNextRoundClash(){
+  hideOverlay();
+  for(const id in players){ resetPlayerForNewRound(players[id]); }
+  updateAmmoUI(); updateLocalHPUI();
+  document.getElementById('glowal-count').textContent = players[localId].glowalCharges;
+  matchOver = false;
+  updateRoundBadge();
+  startCountdown();
+}
+function endClashMatchFinal(winnerTeam){
+  matchOver = true;
+  addCoins(50); // hadiah coin buat 1x main sampai selesai
+  const iWon = winnerTeam==='good';
+  if(iWon){ addWin(matchConfig.ranked); playSound('win'); }
+  const ov = document.getElementById('overlay-msg');
+  document.getElementById('overlay-title').textContent = iWon? 'VICTORY':'GUGUR';
+  document.getElementById('overlay-title').className = iWon? 'victory':'dead';
+  document.getElementById('overlay-sub').textContent = winnerTeam ? (teamLabel(winnerTeam)+' memenangkan pertandingan • Skor ['+(roundScores.good||0)+'-'+(roundScores.evil||0)+']') : 'Pertandingan berakhir seri';
   document.getElementById('overlay-btn').style.display = 'inline-block';
   ov.classList.add('show');
   cleanupOnlineRoom();
@@ -2676,11 +2776,13 @@ function updateBot(bot, dt){
     }
     return;
   }
-  // cari musuh terdekat yang masih hidup (player ataupun bot lain, khusus mode Battle Royale)
+  // cari musuh terdekat yang masih hidup -- kalau bot punya tim (mis. Clash Squad), jangan
+  // pernah target teman satu tim, cuma tim lawan.
   let target=null, bestDist=Infinity;
   for(const id in players){
     if(id===bot.id) continue;
     const t = players[id]; if(!t.alive) continue;
+    if(bot.team && t.team && t.team===bot.team) continue;
     const d = bot.pos.distanceTo(t.pos);
     if(d<bestDist){ bestDist=d; target=t; }
   }
@@ -2691,8 +2793,25 @@ function updateBot(bot, dt){
 
   bot.yaw = Math.atan2(toTarget.x, toTarget.z);
 
+  // AI "pintar": begitu darah tinggal setengah, bot masuk mode bertahan sebentar -- mundur jaga
+  // jarak, tetap hadapkan senjata ke musuh, dan pasang glowal sebagai pelindung kalau masih ada
+  // stok, sebelum lanjut menyerang lagi.
+  if(bot.glowalCd===undefined) bot.glowalCd = 0;
+  if(bot.defendT===undefined) bot.defendT = 0;
+  bot.glowalCd -= dt;
+  if(bot.defendT>0) bot.defendT -= dt;
+  if(bot.hp>0 && bot.hp<=150 && bot.glowalCd<=0 && bot.glowalCharges>0){
+    placeGlowalFor(bot);
+    bot.glowalCd = 5 + Math.random()*3;
+    bot.defendT = 2.2 + Math.random()*1.3;
+  }
+
   let moveVec = new THREE.Vector3();
-  if(dist>9){
+  if(bot.defendT>0){
+    // mode bertahan: mundur jaga jarak sambil geser, tapi tetap hadap & bisa balas tembak
+    moveVec.copy(toTarget).multiplyScalar(-0.85);
+    moveVec.x += Math.cos(bot.walkPhase*0.5)*bot.botStrafeDir*0.35;
+  }else if(dist>9){
     moveVec.copy(toTarget);
   }else if(dist<4){
     moveVec.copy(toTarget).multiplyScalar(-0.4);
@@ -2702,7 +2821,7 @@ function updateBot(bot, dt){
     moveVec.copy(perp);
   }
   moveVec.normalize();
-  const speed = 3.2;
+  const speed = bot.defendT>0 ? 2.6 : 3.2;
   bot.pos.addScaledVector(moveVec, speed*dt);
   bot.walkPhase += dt*7*moveVec.length();
   const R=112; if(bot.pos.length()>R) bot.pos.setLength(R);
@@ -2734,7 +2853,7 @@ function botShoot(bot, dist, target){
     const rangeTier = getRangeTier(dist);
     // bot "agak hebat" headshot -> chance sedikit lebih tinggi dari player biasa
     const headshot = Math.random() < (rangeTier==='far'?0.08:rangeTier==='mid'?0.22:0.4);
-    const dmg = headshot ? 500 : normalDamageForRange(rangeTier);
+    const dmg = headshot ? headshotDamageForWeapon(bot.weaponId) : normalDamageForRange(rangeTier, bot.weaponId);
     applyDamageToTarget(target, dmg, headshot);
     spawnDamageNumber(target, dmg, headshot);
     if(headshot){ playSound('headshot'); notifyHeadshot(bot, target); }
@@ -2775,9 +2894,11 @@ function updateLocalMovement(dt){
 function updateCrosshair(){
   const ch = document.getElementById('crosshair');
   let hot=false;
+  const me = players[localId];
   for(const id in players){
     if(id===localId) continue;
     const t = players[id]; if(!t.alive) continue;
+    if(me && me.team && t.team && t.team===me.team) continue; // jangan nyala merah ke teman satu tim
     const wp = new THREE.Vector3(); t.mesh.userData.torso.getWorldPosition(wp);
     const sp = wp.clone().project(camera);
     if(sp.z>1) continue;
@@ -2891,19 +3012,22 @@ function animate(){
   const dt = Math.min(clock.getDelta(), 0.05);
   if(document.getElementById('hud').classList.contains('active')){
     updateLocalMovement(dt);
-    if(mode==='offline'){
-      for(const id in players){ if(players[id].isBot) updateBot(players[id], dt); }
-    }
+    // FIX: bot lokal (misal bot pengisi Battle Royale di server online) harus tetap jalan &
+    // menyerang walau mode==='online' -- sebelumnya cek mode==='offline' bikin bot itu diam total
+    // di server online karena updateBot() tidak pernah dipanggil buat mereka.
+    for(const id in players){ if(players[id].isBot) updateBot(players[id], dt); }
     for(const id in players){ animateCharacter(players[id], dt); }
     updateCameraFollow();
     updateCrosshair();
     updateNametags();
     updateBRLoot(dt);
-    if(settings.selectedSkin==='rainbow'){
-      const p = players[localId];
-      if(p && p.mesh && p.mesh.userData.clothMat){
-        const hue = (performance.now()/1400) % 1;
-        p.mesh.userData.clothMat.color.setHSL(hue, 0.85, 0.55);
+    if(settings.selectedSkin==='rainbow' || Object.values(players).some(pl=>pl.skinId==='rainbow')){
+      const hue = (performance.now()/1400) % 1;
+      for(const id in players){
+        const pl = players[id];
+        if(pl.skinId==='rainbow' && pl.mesh && pl.mesh.userData.clothMat){
+          pl.mesh.userData.clothMat.color.setHSL(hue, 0.85, 0.55);
+        }
       }
     }
     if(mode==='online') throttledSendState();
@@ -2931,6 +3055,7 @@ document.getElementById('btn-offline-duel').addEventListener('click', ()=>showSc
 document.getElementById('btn-duel-normal').addEventListener('click', ()=>startOfflineMatch('duel', false));
 document.getElementById('btn-duel-headshot').addEventListener('click', ()=>startOfflineMatch('duel', true));
 document.getElementById('btn-offline-br').addEventListener('click', ()=>startOfflineMatch('br'));
+document.getElementById('btn-offline-clash').addEventListener('click', ()=>startClashMatch());
 
 function startOfflineMatch(type, headshotOnly){
   resetMatchState();
@@ -2943,13 +3068,14 @@ function startOfflineMatch(type, headshotOnly){
   const me = makePlayerObj('me', settings.name, getMySkinColor(), false, false);
   players['me'] = me;
   applyMySkinToScene();
-  me.weaponId = ownedToolsSafe().m1887 ? 'm1887' : 'default';
+  me.weaponId = myWeaponId();
 
   const usedNames = new Set();
   if(type==='duel'){
     me.pos.set(0,0,7);
     const bot = makePlayerObj('bot1', randomBotName(usedNames), 0xd43b3b, true, false);
     bot.pos.set(0,0,-7);
+    bot.weaponId = myWeaponId();
     players['bot1'] = bot;
   }else{
     // Battle Royale: 9 bot berpencar + player, jatuh pakai parasut, harus loot dulu, 1 survive menang
@@ -2957,10 +3083,51 @@ function startOfflineMatch(type, headshotOnly){
     resetSpawnPosition(me);
     for(let i=0;i<9;i++){
       const bot = makePlayerObj('bot'+i, randomBotName(usedNames), [0xd43b3b,0xd48b3b,0x8b3bd4,0x3bd4a0,0xd4d13b,0x3b7cd4,0xd43b8f,0x6ad43b,0xd46a3b][i], true, false);
+      bot.weaponId = myWeaponId();
       resetSpawnPosition(bot);
       players['bot'+i] = bot;
     }
   }
+  enterGame();
+  updateRoundBadge();
+}
+
+/* ================= CLASH SQUAD 4v4 (OFFLINE BARU) =================
+   4 pemain tim baik (kamu + 3 bot rekan, spawn di kanan/+X) lawan 4 bot tim jahat
+   (spawn di kiri/-X). Ronde sampai 6, tim pertama menang mayoritas ronde menang match.
+   Bot lebih pintar: kalau darah tinggal setengah, pasang glowal & sempat bertahan dulu
+   sebelum lanjut menyerang (lihat updateBot()). */
+function startClashMatch(){
+  resetMatchState();
+  mode = 'offline';
+  localId = 'me';
+  matchConfig = { type:'clash', totalRounds:6, online:false, ranked:true };
+  consumeAimlock1IfQueued();
+  roundScores = { good:0, evil:0 }; roundN = 1;
+
+  const me = makePlayerObj('me', settings.name, getMySkinColor(), false, false);
+  me.team = 'good';
+  players['me'] = me;
+  applyMySkinToScene();
+  me.weaponId = myWeaponId();
+
+  const usedNames = new Set();
+  const goodColors = [0x2a6ef0,0x3b7cd4,0x3bcfff];
+  const evilColors = [0xd43b3b,0x8b3bd4,0xd48b3b,0xd43b8f];
+  for(let i=0;i<3;i++){
+    const bot = makePlayerObj('good'+i, randomBotName(usedNames), goodColors[i], true, false);
+    bot.team = 'good';
+    bot.weaponId = myWeaponId();
+    players['good'+i] = bot;
+  }
+  for(let i=0;i<4;i++){
+    const bot = makePlayerObj('evil'+i, randomBotName(usedNames), evilColors[i], true, false);
+    bot.team = 'evil';
+    bot.weaponId = myWeaponId();
+    players['evil'+i] = bot;
+  }
+  for(const id in players){ resetSpawnPosition(players[id]); }
+
   enterGame();
   updateRoundBadge();
 }
@@ -3125,7 +3292,7 @@ function beginOnlineMatchFromWait(){
   if(matchConfig.type==='br') buildBRHouses();
   const me = makePlayerObj(localId, settings.name, getMySkinColor(), false, false);
   resetSpawnPosition(me);
-  me.weaponId = ownedToolsSafe().m1887 ? 'm1887' : 'default';
+  me.weaponId = myWeaponId();
   players[localId] = me;
   applyMySkinToScene();
   myFbRef.update({x:me.pos.x, z:me.pos.z, h:me.hp, a:true});
@@ -3141,6 +3308,7 @@ function beginOnlineMatchFromWait(){
     const colors = [0xd43b3b,0xd48b3b,0x8b3bd4,0x3bd4a0,0xd4d13b,0x3b7cd4,0xd43b8f,0x6ad43b,0xd46a3b];
     for(let i=0;i<6;i++){
       const bot = makePlayerObj('br_bot_'+i, randomBotName(usedNames), colors[i%colors.length], true, false);
+      bot.weaponId = myWeaponId();
       resetSpawnPosition(bot);
       players['br_bot_'+i] = bot;
     }
@@ -3155,7 +3323,9 @@ function attachOnlineGameplayListeners(){
   playersRef.on('child_added', snap=>{
     if(snap.key===localId) return;
     const d = snap.val(); if(!d) return;
-    const rp = makePlayerObj(snap.key, d.n||'Player', 0xd43b3b, false, true);
+    const skinDef = skinDefById(d.sk||'default');
+    const rp = makePlayerObj(snap.key, d.n||'Player', skinDef.color, false, true);
+    applySkinToMesh(rp, d.sk||'default');
     rp.pos.set(d.x||0, 0, d.z||0);
     rp.yaw = d.r||0; rp.hp = d.h!==undefined?d.h:300; rp.alive = d.a!==false;
     if(matchConfig.type==='br'){ rp.parachuting=true; rp.chuteY=42+Math.random()*8; rp.hasWeapon=false; if(rp.mesh.userData.gun) rp.mesh.userData.gun.visible=false; }
@@ -3166,6 +3336,7 @@ function attachOnlineGameplayListeners(){
     const d = snap.val(); const rp = players[snap.key];
     if(!rp || snap.key===localId) return;
     rp.pos.set(d.x||0,0,d.z||0); rp.yaw = d.r||0;
+    if(d.sk!==undefined && d.sk!==rp.skinId){ applySkinToMesh(rp, d.sk); }
     if(rp.alive && d.a===false){ rp.alive=false; rp.deathT=0.001; addKillFeed(rp.name+' gugur'); checkVictoryCondition(); }
     if(!rp.alive && d.a===true){ rp.alive=true; rp.deathT=0; rp.mesh.userData.hips.rotation.x=0; rp.mesh.userData.hips.position.y=0.95; }
     rp.hp = d.h!==undefined?d.h:rp.hp;
